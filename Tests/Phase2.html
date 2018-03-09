@@ -1,0 +1,896 @@
+<html>
+	<head>
+		<title>  Partition </title>
+		<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+		<script src="physicsjs-full.min.js" type="text/javascript"></script>
+		
+	</head>
+	<body style='margin:0px;width:100%; height: 100%;'>
+		<div id="containWeb" style='margin:0px;width:100%; height: 100%;'> 
+			<svg id='realitycheck' height="100%" width="100%">
+			</svg>
+		</div>
+		
+		
+		
+		
+		<script>
+
+
+		displaySvg = document.getElementById('realitycheck')
+
+		function addcircle(xval, yval, color) {
+			var circleElement = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
+			circleElement.setAttribute('cx', xval);
+			circleElement.setAttribute('cy', yval);
+			circleElement.setAttribute('r', '0.4%');
+			circleElement.setAttribute('fill',color)
+			displaySvg.appendChild(circleElement);
+		}
+
+		function addline(point1,point2,color='orange') {
+			var lineElement = document.createElementNS("http://www.w3.org/2000/svg", 'line');
+			lineElement.setAttribute('x1',point1[0]);
+			lineElement.setAttribute('y1',point1[1]);
+			lineElement.setAttribute('x2',point2[0]);
+			lineElement.setAttribute('y2',point2[1]);
+			lineElement.style.stroke = color
+			displaySvg.appendChild(lineElement);
+		}
+
+
+
+
+
+
+		Physics({ timestep: 8, sleepDisabled: true },function (world) {
+
+		// bounds of the window
+		var viewportBounds = Physics.aabb(0, 0, window.innerWidth, window.innerHeight)
+			,edgeBounce
+			,renderer
+			;
+
+		// create a renderer
+		renderer = Physics.renderer('canvas', {
+			el: 'viewport'
+		});
+
+		// add the renderer
+		world.add(renderer);
+		// render on each step
+		world.on('step', function () {
+			world.render();
+		});
+
+		 // constrain objects to these bounds
+		edgeBounce = Physics.behavior('edge-collision-detection', {
+			aabb: viewportBounds
+			,restitution: 0.2
+			,cof: 0.2
+		});
+
+		world.add(edgeBounce)
+
+		// resize events
+		window.addEventListener('resize', function () {
+
+			// as of 0.7.0 the renderer will auto resize... so we just take the values from the renderer
+			viewportBounds = Physics.aabb(0, 0, renderer.width, renderer.height);
+			// update the boundaries
+			edgeBounce.setAABB(viewportBounds);
+
+		}, true);
+
+		// for constraints
+		var rigidConstraints = Physics.behavior('verlet-constraints', {
+			iterations: 1
+		});
+
+		// the "web"
+		var web = [];
+
+
+		pointIDs = {}
+		threadsIDs = {}
+
+		// function addThreadStops(location1,location2,state1,state2) {
+		// 	pointIDs[location1[0] + '-' + location1[1]] = Physics.body('circle', {
+		// 			x: location1[0]
+		// 			,y: location1[1]
+		// 			,radius: 4
+		// 			,hidden: false
+		// 			,styles: {
+		// 				fillStyle: 'rgba(255,140,0,0.6)'
+		// 			}
+		// 	})
+		// 	web.push(pointIDs[location1[0] + '-' + location1[1]])
+		// 	pointIDs[location1[0] + '-' + location1[1]].treatment = state1
+			
+
+		// 	pointIDs[location2[0] + '-' + location2[1]] = Physics.body('circle', {
+		// 			x: location2[0]
+		// 			,y: location2[1]
+		// 			,radius: 4
+		// 			,hidden: false
+		// 			,styles: {
+		// 				fillStyle: 'rgba(255,140,0,0.6)'
+		// 			}
+		// 		})
+
+		// 	web.push(pointIDs[location2[0] + '-' + location2[1]])
+		// 	pointIDs[location2[0] + '-' + location2[1]].treatment = state2
+
+		// 	rigidConstraints.distanceConstraint(pointIDs[location1[0] + '-' + location1[1]], pointIDs[location2[0] + '-' + location2[1]], 0.2);
+
+		// }
+
+		// minthreaddistance = 10
+
+		// function findPoints(set1,set2) {
+		// 	set = []
+		// 	set.push(set1)
+
+		// 	x1 = set1[0]
+		// 	y1 = set1[1]
+
+		// 	x2 = set2[0]
+		// 	y2 = set2[1]
+
+		// 	n = 1
+		// 	totaldistance = Math.sqrt((set1[0]-set2[0])**2 + (set1[1]-set2[1])**2)
+		// 	while(n*minthreaddistance < totaldistance) {
+		// 		k = n*minthreaddistance*(x2 - x1)/totaldistance
+		// 		d = n*minthreaddistance*(y2 - y1)/totaldistance
+		// 		set.push([x1 + k,y1+ d])
+		// 		n = n + 1
+		// 	}
+
+		// 	set.push(set2)
+
+		// 	return set
+			
+		// }
+
+		function addThread(location1,location2,state1,state2) {
+
+			threadpoints = findPoints(location1,location2)
+			threadpoint1 = threadpoints[0]
+
+			pointIDs[threadpoint1[0] + '-' + threadpoint1[1]] = Physics.body('circle', {
+					x: threadpoint1[0]
+					,y: threadpoint1[1]
+					,radius: 3
+					,hidden: false
+					,styles: {
+						fillStyle: 'rgba(255,140,0,0.6)'
+					}
+			})
+			web.push(pointIDs[threadpoint1[0] + '-' + threadpoint1[1]])
+
+
+			for(i=0; i < threadpoints.length - 1; i++) {
+
+				threadpoint1 = threadpoints[i]
+
+				
+				if (state1 == 'static' && i == 0) {
+					pointIDs[threadpoint1[0] + '-' + threadpoint1[1]].treatment = state1
+				}
+
+				threadpoint2 = threadpoints[i+1]
+
+				pointIDs[threadpoint2[0] + '-' + threadpoint2[1]] = Physics.body('circle', {
+						x: threadpoint2[0]
+						,y: threadpoint2[1]
+						,radius: 3
+						,hidden: false
+						,styles: {
+							fillStyle: 'rgba(255,140,0,0.6)'
+						}
+					})
+
+				web.push(pointIDs[threadpoint2[0] + '-' + threadpoint2[1]])
+				if (state2 == 'static' && i == threadpoints.length - 2) {
+					pointIDs[threadpoint2[0] + '-' + threadpoint2[1]].treatment = state2
+				}
+
+				rigidConstraints.distanceConstraint(pointIDs[threadpoint1[0] + '-' + threadpoint1[1]], pointIDs[threadpoint2[0] + '-' + threadpoint2[1]], 0.2);
+
+			}
+
+			threadsIDs[location1[0] + '-' + location1[1] + '-' + location2[0] + '-' + location2[1]] = threadpoints
+			
+
+		}
+
+		function addThreadToExisting(pointchoice,location2,state2) {
+			pointOfInterest = pointIDs[pointchoice[0] + '-' + pointchoice[1]]
+			location1 = [pointOfInterest.state.pos.x,pointOfInterest.state.pos.y]
+
+			threadpoints = findPoints(location1,location2)
+			threadpoint1 = threadpoints[0]
+
+
+			for(i=0; i < threadpoints.length - 1; i++) {
+
+				threadpoint1 = threadpoints[i]
+
+				threadpoint2 = threadpoints[i+1]
+
+				pointIDs[threadpoint2[0] + '-' + threadpoint2[1]] = Physics.body('circle', {
+						x: threadpoint2[0]
+						,y: threadpoint2[1]
+						,radius: 3
+						,hidden: false
+						,styles: {
+							fillStyle: 'rgba(255,140,0,0.6)'
+						}
+					})
+
+				web.push(pointIDs[threadpoint2[0] + '-' + threadpoint2[1]])
+				if (state2 == 'static' && i == threadpoints.length - 2) {
+					pointIDs[threadpoint2[0] + '-' + threadpoint2[1]].treatment = state2
+				}
+
+				if(i == 0) {
+					rigidConstraints.distanceConstraint(pointIDs[pointchoice[0] + '-' + pointchoice[1]], pointIDs[threadpoint2[0] + '-' + threadpoint2[1]], 0.2);
+				}
+				else {
+					rigidConstraints.distanceConstraint(pointIDs[threadpoint1[0] + '-' + threadpoint1[1]], pointIDs[threadpoint2[0] + '-' + threadpoint2[1]], 0.2);
+				}
+				
+
+			}
+
+			threadsIDs[location1[0] + '-' + location1[1] + '-' + location2[0] + '-' + location2[1]] = threadpoints
+
+			
+
+
+		}
+
+
+
+
+
+		// mainstrand = [[0,Math.random()*window.innerHeight/8],[window.innerWidth/3 + Math.random()*window.innerWidth/3,window.innerHeight/3 + Math.random()*window.innerHeight/3],[window.innerWidth,Math.random()*window.innerHeight/8]]
+
+		// lowerMainstrand = [[window.innerWidth/3 + Math.random()*window.innerWidth/3,window.innerHeight]]
+
+		// extraMainstrand = [[window.innerWidth/3 + Math.random()*window.innerWidth/3,window.innerHeight]]
+
+		// l1 = [0,Math.random()*window.innerHeight/8]
+		// l2 = [window.innerWidth,Math.random()*window.innerHeight/8]
+
+		// strand = [l1,l2]
+
+		// addThread(l1,l2,'static','static')
+
+		// strandchoices = threadsIDs[l1[0] + '-' + l1[1] + '-' + l2[0] + '-' + l2[1]]
+		// // console.log(strandchoices)
+
+		// newAnchor = [window.innerWidth/3 + Math.random()*window.innerWidth/3,window.innerHeight]
+		// if (strandchoices.length % 2 == 0) {
+		// 	choice = strandchoices.length/2
+		// }
+		// else {
+		// 	choice = (strandchoices.length + 1)/2
+		// }
+
+		// setTimeout( function(){
+		// 	pointIDs[strandchoices[choice][0] + '-' + strandchoices[choice][1]].applyForce(Physics.vector(0,0.7));
+		// 	// pointIDs[strandchoices[choice][0] + '-' + strandchoices[choice][1]].state.vel.y = 4
+		// 	}  ,1000 );
+
+		// setTimeout( function(){
+		// 	addThreadToExisting(strandchoices[choice],newAnchor,'static')
+		// 	}  ,3000 );
+
+		dotDatabase = []
+		dotLocationID = {}
+
+		threadDatabase = []
+		threadLocationID = {}
+
+		function connectToPoint(from,dot) {
+			threadDatabase.push([from, dot])
+			// threadLocationID[from[0] + '-' + from[1] + ':' + dot[0] + '-' + dot[1]] = point
+			dotDatabase.push(dot)
+			addline(from,dot)
+		}
+
+		function joinTwo(p1,p2) {
+			threadDatabase.push([p1, p2])
+			// threadLocationID[from[0] + '-' + from[1] + ':' + dot[0] + '-' + dot[1]] = point
+			addline(p1,p2)
+		}
+
+		function connectToThread(from, direction, thread) {
+			x1 = from[0]
+			y1 = from[1]
+
+			x2 = from[0] + direction[0]
+			y2 = from[1] + direction[1]
+
+			x3 = thread[0][0]
+			y3 = thread[0][1]
+
+			x4 = thread[1][0]
+			y4 = thread[1][1]
+
+			x43 = x4 - x3
+			y31 = y3 - y1
+			x31 = x3 - x1
+			y43 = y4 - y3
+			y21 = y2 - y1
+			x21 = x2 - x1
+
+			t = ((x43*y31) - (x31*y43))/(x43*y21) - (x21*y43)
+
+			intersectionpoint = [x1 + (x2 - x1)*t , y1 + (y2 - y1)*t]
+
+			threadDatabase.splice(threadDatabase.indexOf(thread),1)
+			threadDatabase.push([from, intersectionpoint])
+			threadDatabase.push([intersectionpoint, thread[0]])
+			threadDatabase.push([intersectionpoint, thread[1]])
+
+			dotDatabase.push(intersectionpoint)
+
+		}
+
+		function getIntersection(from, thread) {
+			x1 = from[0][0]
+			y1 = from[0][1]
+
+			x2 = from[1][0]
+			y2 = from[1][1]
+
+			x3 = thread[0][0]
+			y3 = thread[0][1]
+
+			x4 = thread[1][0]
+			y4 = thread[1][1]
+
+
+			x43 = x4 - x3
+			y31 = y3 - y1
+			x31 = x3 - x1
+			y43 = y4 - y3
+			y21 = y2 - y1
+			x21 = x2 - x1
+
+			t = ((x43*y31) - (x31*y43))/((x43*y21) - (x21*y43))
+
+
+			intersectionpoint = [x1 + (x2 - x1)*t , y1 + (y2 - y1)*t]
+
+			return intersectionpoint
+
+		}
+
+
+		allPoints = []
+		allPointsConnections = {}
+		connections = []
+		
+
+		// Getting the centre
+		centredeviation = 10
+		centerX = window.innerWidth/2 + 2*(Math.random() - 0.5)*centredeviation
+		centerY = window.innerHeight/2 + 2*(Math.random() - 0.5)*centredeviation
+
+		centrepoint = [centerX,centerY]
+		allPointsConnections[centrepoint[0] + '-' + centrepoint[1]] = []
+		allPoints.push(centrepoint)
+
+		addcircle(centerX,centerY)
+
+		dotDatabase.push(centrepoint)
+		
+		radiiAngles = []
+		radiiArm = []
+
+		eastangle = 30
+		mainradiinumber = 6
+		anglespacing = 360/mainradiinumber
+		spacingdeviation = 10
+
+		angleiter = eastangle
+
+		lengthPreferenceEast = window.innerWidth/3
+		lengthPreferenceWest = window.innerWidth/3
+		lengthPreferenceNorth = window.innerHeight/3
+		lengthPreferenceSouth = window.innerHeight/3
+
+		avgprefLength = (lengthPreferenceEast + lengthPreferenceSouth + lengthPreferenceNorth + lengthPreferenceWest)/4
+
+		mainradiilengths = []
+
+		interpolationFactor = 0.5
+
+		while(angleiter < 360) {
+			radiiAngles.push(angleiter)
+			if (angleiter <= 90 && angleiter > 0) {
+				y = ((lengthPreferenceSouth - lengthPreferenceEast - 90*interpolationFactor)/(90*90))*(angleiter*angleiter) + (interpolationFactor*angleiter) + lengthPreferenceEast
+				mainradiilengths.push(y)
+			}
+			else if (angleiter <= 180 && angleiter > 90) {
+				anglecompensate = angleiter - 90
+				y = ((lengthPreferenceWest - lengthPreferenceSouth - 90*interpolationFactor)/(90*90))*(anglecompensate*anglecompensate) + (interpolationFactor*anglecompensate) + lengthPreferenceSouth
+				mainradiilengths.push(y)
+			}
+			else if (angleiter <= 270 && angleiter > 180) {
+				anglecompensate = angleiter - 180
+				y = ((lengthPreferenceNorth - lengthPreferenceWest - 90*interpolationFactor)/(90*90))*(anglecompensate*anglecompensate) + (interpolationFactor*anglecompensate) + lengthPreferenceWest
+				mainradiilengths.push(y)
+			}
+			else if (angleiter <= 360 && angleiter > 270) {
+				anglecompensate = angleiter - 270
+				y = ((lengthPreferenceEast - lengthPreferenceNorth - 90*interpolationFactor)/(90*90))*(anglecompensate*anglecompensate) + (interpolationFactor*anglecompensate) + lengthPreferenceNorth
+				mainradiilengths.push(y)
+			}
+			angleiter = angleiter + anglespacing + (spacingdeviation*2*(Math.random() - 0.5))
+		}
+
+
+
+		mainradiiPoints = []
+
+		for(i = 0; i < mainradiilengths.length; i++) {
+			mainradiiPoints.push([centerX + Math.cos(Math.PI*radiiAngles[i]/180)*mainradiilengths[i], centerY + Math.sin(Math.PI*radiiAngles[i]/180)*mainradiilengths[i]])
+		}
+
+
+		for(i = 0; i < mainradiiPoints.length; i++) {
+			addcircle(mainradiiPoints[i][0], mainradiiPoints[i][1])
+			allPointsConnections[mainradiiPoints[i][0] + '-' + mainradiiPoints[i][1]] = []
+			allPoints.push(mainradiiPoints[i])
+			connectToPoint(centrepoint, mainradiiPoints[i])
+		}
+
+		possibleborders = [[[0,0],[window.innerWidth,0]],[[window.innerWidth,0],[window.innerWidth,window.innerHeight]],[[window.innerWidth,window.innerHeight],[0,window.innerHeight]],[[0,window.innerHeight],[0,0]]]
+
+		frameHolders = []
+
+		for(k = 0; k < mainradiiPoints.length; k++) {
+			nearestindex = 0
+			nearestindexdist = 0
+			chosenintersect = []
+			for(i = 0; i < possibleborders.length; i++) {
+				intersect = getIntersection([centrepoint,mainradiiPoints[k]],possibleborders[i])
+				dist = Math.sqrt((intersect[0] - mainradiiPoints[k][0])**2 + (intersect[1] - mainradiiPoints[k][1])**2)
+				if (i == 0) {
+					nearestindexdist = dist
+					chosenintersect = intersect
+				}
+				if(i > 0 && dist < nearestindexdist) {
+					nearestindex = i
+					nearestindexdist = dist
+					chosenintersect = intersect
+				}
+			}
+
+		connectToPoint(mainradiiPoints[k],chosenintersect)
+		addcircle(chosenintersect[0],chosenintersect[1])
+		allPointsConnections[chosenintersect[0] + '-' + chosenintersect[1]] = []
+		allPoints.push(chosenintersect)
+		frameHolders.push(chosenintersect)
+		connectToPoint(mainradiiPoints[k],chosenintersect)
+		joinTwo(mainradiiPoints[k],mainradiiPoints[(k+1) % mainradiiPoints.length])
+		connections.push([chosenintersect,mainradiiPoints[k]])
+		}
+
+
+		eastSubradiiPref = 20
+		southSubradiiPref = 20
+		westSubradiiPref = 20
+		northSubradiiPref = 20
+
+		avgpref = (eastSubradiiPref + westSubradiiPref + northSubradiiPref + southSubradiiPref)/4
+
+		subradiiAngles = []
+		allRadii = []
+
+		for(i=0; i < radiiAngles.length; i++) {
+			currentMradii = radiiAngles[i]
+			nextMradii = radiiAngles[(i+1)%radiiAngles.length]
+			if (i == radiiAngles.length - 1) {
+				nextMradii = nextMradii + 360
+			}
+			angleiter = currentMradii
+			subangles = []
+			while(angleiter < nextMradii - avgpref/2) {
+				if(angleiter >= 315 && angleiter < 405) {
+					angleiter = angleiter + eastSubradiiPref
+				}
+				else if(angleiter < 45) {
+					angleiter = angleiter + eastSubradiiPref
+				}
+				else if(angleiter >= 45 && angleiter < 135) {
+					angleiter = angleiter + southSubradiiPref
+				}
+				else if(angleiter >= 135 && angleiter < 225) {
+					angleiter = angleiter + westSubradiiPref
+				}
+				else if(angleiter >= 225 && angleiter < 315) {
+					angleiter = angleiter + northSubradiiPref
+				}
+				subangles.push(angleiter % 360)
+				
+				
+			}
+			subangles.splice(subangles.length - 1, 1)
+			subradiiAngles.push(subangles)
+
+		}
+
+		allRadiiAngles = []
+
+
+		subradiiPoints = []
+		for(i = 0; i < subradiiAngles.length; i++) {
+			angleset = subradiiAngles[i]
+			subpoints = []
+			allRadii.push(mainradiiPoints[i])
+			arm = []
+			allRadiiAngles.push(radiiAngles[i])
+			radiiArm.push(arm)
+			for(k = 0; k < angleset.length; k++) {
+				arm = []
+				scale = 200
+				angledirection = [centerX + scale*Math.cos(Math.PI*angleset[k]/180), centerY + scale*Math.sin(Math.PI*angleset[k]/180)]
+				intersect = getIntersection([centrepoint,angledirection],[mainradiiPoints[i],mainradiiPoints[(i+1)%mainradiiPoints.length]])
+				subpoints.push(intersect)
+				addcircle(intersect[0],intersect[1])
+				allPointsConnections[intersect[0] + '-' + intersect[1]] = []
+				allPoints.push(intersect)
+				addline(centrepoint,intersect,'grey')
+				allRadii.push(intersect)
+				allRadiiAngles.push(angleset[k])
+				radiiArm.push(arm)
+			}
+			subradiiPoints.push(subpoints)
+		}
+
+		// console.log(radiiAngles)
+		// console.log(subradiiAngles)
+		// console.log(subradiiPoints)
+
+		initialspiraldistance = 5
+		endspiraldistance = 50
+
+		if (endspiraldistance > avgprefLength) {
+			endspiraldistance = avgprefLength/6
+		}
+
+		distance = initialspiraldistance
+
+		lastdistance = distance
+
+		spiralincrement = (endspiraldistance - initialspiraldistance)/allRadii.length
+		initRadiiAnglesIndex = Math.floor(Math.random() * allRadiiAngles.length)
+		initRadiiAngles = allRadiiAngles[initRadiiAnglesIndex]
+
+		currentIndex = initRadiiAnglesIndex
+		lastRadiiIndex = currentIndex
+
+		onRadiiPoints = []
+		spiralPoints = []
+
+		previouspoint = centrepoint
+
+
+		for(i = 0; i < allRadiiAngles.length; i++) {
+			
+
+			currentRadiiAngle = allRadiiAngles[(currentIndex + i) % allRadiiAngles.length]
+			point = [centerX + (Math.cos(currentRadiiAngle*Math.PI/180)*distance) , centerY + (Math.sin(currentRadiiAngle*Math.PI/180)*(distance))]
+
+			
+			addline(previouspoint,point,'blue')
+			connections.push([previouspoint,point])
+			addcircle(point[0],point[1])
+			allPointsConnections[point[0] + '-' + point[1]] = []
+			allPoints.push(point)
+			allPointsConnections[centrepoint[0] + '-' + centrepoint[1]].push(point)
+			allPointsConnections[point[0] + '-' + point[1]].push(centrepoint)
+			connections.push([centrepoint,point])
+			
+			lastdistance = distance
+			distance = distance + spiralincrement
+			onRadiiPoints.push(point)
+			spiralPoints.push(point)
+			lastRadiiIndex = (currentIndex + i) % allRadiiAngles.length
+			previouspoint = point
+			radiiArm[(currentIndex + i) % allRadiiAngles.length].push(point)
+			
+		}
+
+		// From https://stackoverflow.com/questions/22521982/js-check-if-point-inside-a-polygon
+		function inside(point, vs) {
+			// ray-casting algorithm based on
+			// http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html
+
+			var x = point[0], y = point[1];
+
+			var inside = false;
+			for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+				var xi = vs[i][0], yi = vs[i][1];
+				var xj = vs[j][0], yj = vs[j][1];
+
+				var intersect = ((yi > y) != (yj > y))
+					&& (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+				if (intersect) inside = !inside;
+			}
+
+			return inside;
+		};
+
+		webFrame = mainradiiPoints
+
+		nextPointStatus = 1
+		radiiIter = 1
+
+		// currentIndex = lastRadiiIndex
+		distance = lastdistance
+
+		iterdirection = 1
+
+		distanceproductFactor = 1.008
+		meshdeviationFactor = 0.2
+		distance = distance*distanceproductFactor
+
+		noRoomDoubleCheck = 0
+
+		reverseDistanceFactor = 5
+
+
+		while(nextPointStatus == 1) {
+			currentIndex = (lastRadiiIndex + radiiIter) % allRadiiAngles.length
+			currentRadiiAngle = allRadiiAngles[currentIndex]
+			
+			pointchosen = [centerX + (Math.cos(currentRadiiAngle*Math.PI/180)*distance) , centerY + (Math.sin(currentRadiiAngle*Math.PI/180)*(distance))]
+			if (inside(pointchosen, webFrame) == false) {
+				iterdirection = (-1)*iterdirection
+				radiiIter = radiiIter + 2*iterdirection
+				distance = (distance*((distanceproductFactor)**(reverseDistanceFactor))) + (meshdeviationFactor*(Math.random() - 0.5)*2)
+				noRoomDoubleCheck = noRoomDoubleCheck + 1
+				if (noRoomDoubleCheck >= 2) {
+					break
+				}
+			}
+			else {
+				radiiIter = radiiIter + iterdirection
+				addline(previouspoint,pointchosen,'blue')
+				connections.push([previouspoint,pointchosen])
+				addcircle(pointchosen[0], pointchosen[1],'red')
+				allPointsConnections[pointchosen[0] + '-' + pointchosen[1]] = []
+				allPoints.push(pointchosen)
+				// connections.push([pointchosen, onRadiiPoints[onRadiiPoints.length - allRadiiAngles.length]])
+				onRadiiPoints.push(pointchosen)
+				radiiArm[currentIndex].push(pointchosen)
+				
+				previouspoint = pointchosen
+				distance = distance*distanceproductFactor + (meshdeviationFactor*(Math.random() - 0.5)*2)
+				noRoomDoubleCheck = 0
+			}
+		}
+
+		for (i=0; i < radiiArm.length; i++) {
+			arm = radiiArm[i]
+			for (k=0; k < arm.length - 1; k++) {
+				connections.push([arm[k], arm[k+1]])
+			}
+			connections.push([arm[arm.length - 1], allRadii[i]])
+		}
+
+		for (i=0; i < allRadii.length; i++) {
+			connections.push([allRadii[(i+1)%allRadii.length], allRadii[i]])
+		}
+
+
+
+
+
+
+
+
+
+		
+
+
+
+
+
+
+
+
+		
+		// addThreadToExisting(mainstrand[1],mainstrand[2],'kinetic','static')
+		// addThreadToExisting(mainstrand[1],lowerMainstrand[0],'kinetic','static')
+		// addThreadToExisting(mainstrand[1],lowerMainstrand[0],'kinetic','static')
+		// addThreadToExisting(mainstrand[1],lowerMainstrand[0],'kinetic','static')
+
+
+
+		// for (k=0; k<100; k++) {
+		// 	addThread([Math.random()*window.innerWidth,Math.random()*window.innerHeight/3],[Math.random()*window.innerWidth,Math.random()*window.innerHeight/3])
+		// }
+
+		
+
+
+		// world.add(Physics.body('circle', {
+		// 				x: 100
+		// 				,y: 200
+		// 				,radius: 10
+		// 				,hidden: false
+		// 			}))
+		allPointsEntities = []
+		allPointsEntitiesIDs = {}
+		for(i = 0; i < allPoints.length; i++) {
+			entity = Physics.body('circle', {
+					x: allPoints[i][0]
+					,y: allPoints[i][1]
+					,radius: 8
+					,hidden: true
+				})
+			allPointsEntities.push(entity);
+			allPointsEntitiesIDs[allPoints[i][0] + '-' + allPoints[i][1]] = entity
+
+		}
+
+		for(i = 0; i < connections.length; i++) {
+			p1 = connections[i][0]
+			p2 = connections[i][1]
+			rigidConstraints.distanceConstraint(allPointsEntitiesIDs[p1[0] + '-' + p1[1]], allPointsEntitiesIDs[p2[0] + '-' + p2[1]], 0.5);
+		}
+
+		for(i = 0; i < frameHolders.length; i++) {
+			allPointsEntitiesIDs[frameHolders[i][0] + '-' + frameHolders[i][1]].treatment = 'static'
+		}
+
+		// // the "cloth"
+		// var cloth = [];
+		// for ( var row = 0, l = 35; row < l; ++row ){
+		// 	for ( var col = 0, lcol = 35; col < lcol; ++col ){
+
+		// 		cloth.push(
+		// 			Physics.body('circle', {
+		// 				x: 8 * col + (renderer.width - l * 8) / 2
+		// 				,y: 8 * row + (renderer.height/2 - 200)
+		// 				,radius: 3
+		// 				,hidden: false
+		// 			})
+		// 		);
+
+		// 		if (col > 0){
+		// 			// horizontal
+		// 			rigidConstraints.distanceConstraint(cloth[ lcol * row + col - 1 ], cloth[ lcol * row + col ], 0.2);
+		// 		}
+
+		// 		if (row > 0){
+
+		// 			// vertical
+		// 			rigidConstraints.distanceConstraint(cloth[ lcol * row + col ], cloth[ lcol * (row - 1) + col ], 0.2);
+		// 		} else {
+
+		// 			cloth[ lcol * row + col ].treatment = 'static';
+		// 		}
+		// 	}
+		// }
+
+
+		world.on('integrate:positions', function(){
+
+			var constraints = rigidConstraints.getConstraints().distanceConstraints
+				,c
+				,threshold = 60
+				,scratch = Physics.scratchpad()
+				,v = scratch.vector()
+				,len
+				;
+
+			for ( var i = 0, l = constraints.length; i < l; ++i ){
+
+				c = constraints[ i ];
+				len = v.clone( c.bodyB.state.pos ).vsub( c.bodyA.state.pos ).norm();
+
+				// break the constraint if above threshold
+				if ( (c.bodyA.treatment !== 'static' && c.bodyB.treatment !== 'static') && (len - c.targetLength) > threshold ){
+					rigidConstraints.remove( c );
+				}
+				else if ( (c.bodyA.treatment === 'static' && c.bodyB.treatment === 'static') && (len - c.targetLength) > 100 ){
+					rigidConstraints.remove( c );
+				}
+			}
+
+			scratch.done();
+			// higher priority than constraint resolution
+		}, null, 100);
+
+		// render
+		var webStyles = { strokeStyle: 'rgba(0,0,0,1)', lineWidth: 1 };
+		world.on('render', function( data ){
+
+			var renderer = data.renderer
+				,constraints = rigidConstraints.getConstraints().distanceConstraints
+				,c
+				,ctx = renderer.ctx
+				,t = data.meta.interpolateTime || 0
+				;
+
+			// optimized line drawing
+			ctx.beginPath();
+			ctx.strokeStyle = webStyles.strokeStyle;
+			ctx.lineWidth = webStyles.lineWidth;
+			for ( var i = 0, l = constraints.length; i < l; ++i ){
+
+				c = constraints[ i ];
+				ctx.moveTo(c.bodyA.state.pos.x + c.bodyA.state.vel.x * t, c.bodyA.state.pos.y + c.bodyA.state.vel.y * t);
+				ctx.lineTo(c.bodyB.state.pos.x + c.bodyB.state.vel.x * t, c.bodyB.state.pos.y + c.bodyB.state.vel.y * t);
+			}
+			ctx.stroke();
+		});
+
+		// add things to world
+		world.add( allPointsEntities );
+		world.add( rigidConstraints );
+
+		 // add things to the world
+		world.add([
+			,Physics.behavior('body-impulse-response')
+			,Physics.behavior('body-collision-detection')
+			,Physics.behavior('sweep-prune')
+			,edgeBounce
+		]);
+
+		// add some fun interaction
+		var attractor = Physics.behavior('attractor', {
+			order: 0,
+			strength: 0.005
+		});
+		world.on({
+			'interact:poke': function( pos ){
+				world.wakeUpAll();
+				attractor.position( pos );
+				world.add( attractor );
+			}
+			,'interact:move': function( pos ){
+				attractor.position( pos );
+			}
+			,'interact:release': function(){
+				world.wakeUpAll();
+				world.remove( attractor );
+			}
+		});
+
+		// add things to the world
+		world.add([
+			Physics.behavior('interactive', { el: renderer.container, moveThrottle: 5 })
+			,Physics.behavior('constant-acceleration', {acc: Physics.vector(0,0.0000001)})
+		]);
+
+		// subscribe to ticker to advance the simulation
+		Physics.util.ticker.on(function( time ) {
+			world.step( time );
+			world.add( web );
+			world.add( rigidConstraints );
+		});
+
+
+		});
+
+		var fragment = document.createDocumentFragment();
+		fragment.appendChild(document.getElementById('viewport'));
+		document.getElementById('containWeb').appendChild(fragment);
+
+		// document.getElementById('viewport').height = canvasheight;
+		
+		</script>
+
+
+
+	</body>
+<html>
